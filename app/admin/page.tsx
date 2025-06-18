@@ -1,8 +1,13 @@
+"use client"
+
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { PlusCircle, Edit, Trash2, Eye, BarChart3 } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Eye, BarChart3, LogOut } from "lucide-react"
+import AdminGuard from "@/components/admin-guard"
+import { useAuth } from "@/hooks/use-auth"
 
 // Mock data for admin dashboard
 const stats = [
@@ -35,14 +40,39 @@ const recentPosts = [
   },
 ]
 
-export default function AdminPage() {
+function AdminDashboard() {
+  const router = useRouter()
+  const { signOut, user } = useAuth()
+
+  const handleLogout = async () => {
+    const { error } = await signOut()
+    if (!error) {
+      router.push("/admin/login")
+    }
+  }
+
   return (
     <div className="min-h-screen py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-black mb-2">글 관리</h1>
-          <p className="text-gray-600">블로그 글 작성 및 관리</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-black mb-2">글 관리</h1>
+            <p className="text-gray-600">블로그 글 작성 및 관리</p>
+            {user && (
+              <p className="text-sm text-gray-500 mt-1">
+                로그인: {user.email}
+              </p>
+            )}
+          </div>
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            className="border-black text-black hover:bg-gray-50"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            로그아웃
+          </Button>
         </div>
 
         {/* Stats */}
@@ -154,5 +184,13 @@ export default function AdminPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function AdminPage() {
+  return (
+    <AdminGuard>
+      <AdminDashboard />
+    </AdminGuard>
   )
 }
