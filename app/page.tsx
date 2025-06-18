@@ -46,15 +46,15 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="bg-white py-20 lg:py-32">
+      <section className="bg-white py-32 lg:py-48">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl lg:text-6xl font-bold text-black mb-6">
+            <h1 className="text-4xl lg:text-6xl font-bold text-black mb-12">
               안녕하세요,
               <br />
               <span className="text-gray-700">개발자 서경진입니다</span>
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
               프론트엔드 개발자로서 새로운 기술을 탐구하고, 배운 것들을 기록하며 공유하는 공간입니다. 함께 성장해나가요.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
