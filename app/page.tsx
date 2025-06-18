@@ -2,47 +2,40 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, ArrowRight } from "lucide-react"
+import { postsService } from "@/lib/posts"
+import { Post } from "@/types/post"
 
-// Mock data for recent posts
-const recentPosts = [
-  {
-    id: 1,
-    title: "Next.js 15의 새로운 기능들",
-    excerpt: "Next.js 15에서 추가된 새로운 기능들과 개선사항들을 살펴보겠습니다.",
-    date: "2024-01-15",
-    readTime: "5분",
-  },
-  {
-    id: 2,
-    title: "React Server Components 완벽 가이드",
-    excerpt: "React Server Components의 개념부터 실제 구현까지 상세히 알아보겠습니다.",
-    date: "2024-01-10",
-    readTime: "8분",
-  },
-  {
-    id: 3,
-    title: "TypeScript 5.0 새로운 기능 정리",
-    excerpt: "TypeScript 5.0에서 추가된 새로운 기능들과 변경사항을 정리했습니다.",
-    date: "2024-01-05",
-    readTime: "6분",
-  },
-  {
-    id: 4,
-    title: "효율적인 Git 워크플로우 구축하기",
-    excerpt: "팀 개발에서 효율적인 Git 워크플로우를 구축하는 방법을 공유합니다.",
-    date: "2023-12-28",
-    readTime: "7분",
-  },
-  {
-    id: 5,
-    title: "웹 성능 최적화 실전 가이드",
-    excerpt: "실제 프로젝트에서 적용할 수 있는 웹 성능 최적화 기법들을 소개합니다.",
-    date: "2023-12-20",
-    readTime: "10분",
-  },
-]
+// 날짜 포맷팅 함수
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+}
 
-export default function HomePage() {
+// 읽기 시간 계산 함수
+function calculateReadTime(content: string): number {
+  const wordsPerMinute = 200
+  const words = content.split(/\s+/).length
+  return Math.ceil(words / wordsPerMinute)
+}
+
+export default async function HomePage() {
+  // 최근 발행된 글 가져오기 (에러 핸들링 포함)
+  let recentPosts: Post[] = []
+  
+  try {
+    recentPosts = await postsService.getRecentPosts(5)
+  } catch (error) {
+    // 개발 환경에서 에러 로깅
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Home page error loading recent posts:', error)
+    }
+    // 에러가 발생해도 빈 배열로 처리하여 페이지가 깨지지 않도록 함
+    recentPosts = []
+  }
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -80,37 +73,58 @@ export default function HomePage() {
             <p className="text-gray-600 text-lg">최근에 작성한 개발 관련 글들을 확인해보세요</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {recentPosts.map((post) => (
-              <Card
-                key={post.id}
-                className="bg-white border border-gray-200 hover:shadow-lg transition-shadow duration-300"
-              >
-                <CardHeader>
-                  <CardTitle className="text-xl font-semibold text-black hover:text-gray-700 transition-colors">
-                    <Link href={`/articles/${post.id}`}>{post.title}</Link>
-                  </CardTitle>
-                  <div className="flex items-center text-sm text-gray-500 space-x-4">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {post.date}
+          {recentPosts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {recentPosts.map((post) => (
+                <Card
+                  key={post.id}
+                  className="bg-white border border-gray-200 hover:shadow-lg transition-shadow duration-300"
+                >
+                  <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-black hover:text-gray-700 transition-colors">
+                      <Link href={`/articles/${post.slug}`}>{post.title}</Link>
+                    </CardTitle>
+                    <div className="flex items-center text-sm text-gray-500 space-x-4">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {post.published_at ? formatDate(post.published_at) : '미발행'}
+                      </div>
+                      <span>{post.read_time}분 읽기</span>
                     </div>
-                    <span>{post.readTime} 읽기</span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 leading-relaxed">{post.excerpt}</p>
-                  <Link
-                    href={`/articles/${post.id}`}
-                    className="inline-flex items-center text-black hover:text-gray-700 font-medium mt-4 transition-colors"
-                  >
-                    더 읽기
-                    <ArrowRight className="ml-1 h-4 w-4" />
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                      {post.excerpt || post.content.substring(0, 150) + '...'}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {post.tags.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <Link
+                      href={`/articles/${post.slug}`}
+                      className="inline-flex items-center text-black hover:text-gray-700 font-medium transition-colors"
+                    >
+                      더 읽기
+                      <ArrowRight className="ml-1 h-4 w-4" />
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg mb-4">아직 게시글이 없습니다.</p>
+              <Button asChild variant="outline" className="border-black text-black hover:bg-gray-50">
+                <Link href="/articles">게시글 목록 보기</Link>
+              </Button>
+            </div>
+          )}
 
           <div className="text-center mt-12">
             <Button asChild variant="outline" size="lg" className="border-black text-black hover:bg-gray-50">

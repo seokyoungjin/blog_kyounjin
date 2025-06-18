@@ -1,48 +1,63 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { PlusCircle, Edit, Trash2, Eye, BarChart3, LogOut } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Eye, BarChart3, LogOut, Save, X } from "lucide-react"
 import AdminGuard from "@/components/admin-guard"
 import { useAuth } from "@/hooks/use-auth"
+import { postsService } from "@/lib/posts"
+import { Post, CreatePostData, PostStats } from "@/types/post"
 
-// Mock data for admin dashboard
-const stats = [
-  { title: "총 글 수", value: "24", icon: BarChart3 },
-  { title: "발행된 글", value: "21", icon: Eye },
-  { title: "초안", value: "3", icon: Edit },
-]
-
-const recentPosts = [
-  {
-    id: 1,
-    title: "Next.js 15의 새로운 기능들",
-    status: "발행됨",
-    date: "2024-01-15",
-    views: "1,234",
-  },
-  {
-    id: 2,
-    title: "React Server Components 완벽 가이드",
-    status: "발행됨",
-    date: "2024-01-10",
-    views: "2,156",
-  },
-  {
-    id: 3,
-    title: "TypeScript 5.0 새로운 기능 정리",
-    status: "초안",
-    date: "2024-01-05",
-    views: "0",
-  },
-]
+// 날짜 포맷팅 함수
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}
 
 function AdminDashboard() {
   const router = useRouter()
   const { signOut, user } = useAuth()
+  const [posts, setPosts] = useState<Post[]>([])
+  const [stats, setStats] = useState<PostStats>({ total: 0, published: 0, draft: 0 })
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editingPost, setEditingPost] = useState<Post | null>(null)
+  const [formData, setFormData] = useState<CreatePostData>({
+    title: '',
+    content: '',
+    excerpt: '',
+    slug: '',
+    status: 'published',
+    tags: [],
+    read_time: 5
+  })
+
+  // 데이터 로드
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      const [postsData, statsData] = await Promise.all([
+        postsService.getAllPosts(),
+        postsService.getStats()
+      ])
+      setPosts(postsData)
+      setStats(statsData)
+    } catch (error) {
+      console.error('데이터 로드 실패:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogout = async () => {
     const { error } = await signOut()
@@ -51,137 +66,159 @@ function AdminDashboard() {
     }
   }
 
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await postsService.createPost(formData)
+      setFormData({
+        title: '',
+        content: '',
+        excerpt: '',
+        slug: '',
+        status: 'published',
+        tags: [],
+        read_time: 5
+      })
+      setShowForm(false)
+      loadData()
+    } catch (error) {
+      console.error('글 생성 실패:', error)
+    }
+  }
+
+  const handleUpdatePost = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingPost) return
+    
+    try {
+      await postsService.updatePost(editingPost.id, formData)
+      setEditingPost(null)
+      setFormData({
+        title: '',
+        content: '',
+        excerpt: '',
+        slug: '',
+        status: 'published',
+        tags: [],
+        read_time: 5
+      })
+      loadData()
+    } catch (error) {
+      console.error('글 수정 실패:', error)
+    }
+  }
+
+  const handleDeletePost = async (id: string) => {
+    if (!confirm('정말로 이 글을 삭제하시겠습니까?')) return
+    
+    try {
+      await postsService.deletePost(id)
+      loadData()
+    } catch (error) {
+      console.error('글 삭제 실패:', error)
+    }
+  }
+
+  const handleEditPost = (post: Post) => {
+    setEditingPost(post)
+    setFormData({
+      title: post.title,
+      content: post.content,
+      excerpt: post.excerpt || '',
+      slug: post.slug,
+      status: post.status,
+      tags: post.tags,
+      read_time: post.read_time
+    })
+    setShowForm(true)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingPost(null)
+    setShowForm(false)
+    setFormData({
+      title: '',
+      content: '',
+      excerpt: '',
+      slug: '',
+      status: 'published',
+      tags: [],
+      read_time: 5
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen py-20 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-black mb-2">글 관리</h1>
-            <p className="text-gray-600">블로그 글 작성 및 관리</p>
-            {user && (
-              <p className="text-sm text-gray-500 mt-1">
-                로그인: {user.email}
-              </p>
-            )}
+    <div className="max-w-2xl mx-auto py-12">
+      <h1 className="text-2xl font-bold mb-6">관리자 페이지</h1>
+      {/* 새 글 작성 폼 */}
+      <form onSubmit={editingPost ? handleUpdatePost : handleCreatePost} className="space-y-4 border p-4 rounded mb-8">
+        <input
+          className="w-full border px-3 py-2 rounded"
+          placeholder="제목"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          required
+        />
+        <input
+          className="w-full border px-3 py-2 rounded"
+          placeholder="슬러그 (영어, 숫자, - 만)"
+          value={formData.slug}
+          onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+          required
+        />
+        <input
+          className="w-full border px-3 py-2 rounded"
+          placeholder="요약"
+          value={formData.excerpt}
+          onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
+        />
+        <textarea
+          className="w-full border px-3 py-2 rounded"
+          placeholder="내용"
+          value={formData.content}
+          onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+          rows={6}
+          required
+        />
+        <button type="submit" className="bg-black text-white px-4 py-2 rounded">저장</button>
+      </form>
+
+      {/* 글 목록 */}
+      <div>
+        <h2 className="font-semibold mb-4">글 목록</h2>
+        {posts.map(post => (
+          <div key={post.id} className="flex items-center justify-between border-b py-2">
+            <div>
+              <div className="font-bold">{post.title}</div>
+              <div className="text-xs text-gray-500">{post.created_at?.slice(0, 10)}</div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                className="px-3 py-1 bg-gray-200 rounded"
+                onClick={() => router.push(`/articles/${post.slug}`)}
+              >
+                보기
+              </button>
+              <button
+                className="px-3 py-1 bg-red-500 text-white rounded"
+                onClick={() => handleDeletePost(post.id)}
+              >
+                삭제
+              </button>
+            </div>
           </div>
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            className="border-black text-black hover:bg-gray-50"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            로그아웃
-          </Button>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <Card key={index} className="border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                    <p className="text-2xl font-bold text-black">{stat.value}</p>
-                  </div>
-                  <stat.icon className="h-8 w-8 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Quick Actions */}
-          <Card className="border border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-black">빠른 작업</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button className="w-full bg-black text-white hover:bg-gray-800">
-                <PlusCircle className="mr-2 h-4 w-4" />새 글 작성
-              </Button>
-              <Button variant="outline" className="w-full border-black text-black hover:bg-gray-50">
-                <Edit className="mr-2 h-4 w-4" />
-                초안 관리
-              </Button>
-              <Button variant="outline" className="w-full border-black text-black hover:bg-gray-50">
-                <BarChart3 className="mr-2 h-4 w-4" />글 통계 보기
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Recent Posts Management */}
-          <Card className="border border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-black">최근 글 관리</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentPosts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <h3 className="font-medium text-black truncate">{post.title}</h3>
-                      <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                        <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            post.status === "발행됨" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {post.status}
-                        </span>
-                        <span>{post.date}</span>
-                        <span>조회수: {post.views}</span>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button size="sm" variant="ghost" className="text-gray-600 hover:text-black">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="text-gray-600 hover:text-red-600">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Post Form */}
-        <Card className="mt-8 border border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-black">빠른 글 작성</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">제목</label>
-              <Input placeholder="글 제목을 입력하세요..." className="border-gray-300 focus:border-black" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
-              <Textarea placeholder="글 내용을 입력하세요..." rows={6} className="border-gray-300 focus:border-black" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">태그</label>
-              <Input
-                placeholder="태그를 쉼표로 구분하여 입력하세요..."
-                className="border-gray-300 focus:border-black"
-              />
-            </div>
-            <div className="flex space-x-4">
-              <Button className="bg-black text-white hover:bg-gray-800">발행하기</Button>
-              <Button variant="outline" className="border-black text-black hover:bg-gray-50">
-                초안 저장
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        ))}
       </div>
     </div>
   )
