@@ -3,7 +3,7 @@ export interface Post {
   title: string
   content: string
   excerpt: string | null
-  slug: string
+  category: string
   status: 'draft' | 'published' | 'archived'
   tags: string[]
   author_id: string | null
@@ -18,7 +18,7 @@ export interface CreatePostData {
   title: string
   content: string
   excerpt?: string
-  slug: string
+  category: string
   status?: 'draft' | 'published' | 'archived'
   tags?: string[]
   read_time?: number

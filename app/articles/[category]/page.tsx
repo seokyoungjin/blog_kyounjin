@@ -3,17 +3,17 @@ import { notFound } from "next/navigation"
 import ReactMarkdown from "react-markdown"
 
 interface ArticlePageProps {
-  params: { slug: string }
+  params: { category: string }
 }
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
   try {
-    // slug 검증
-    if (!params.slug || typeof params.slug !== 'string') {
+    // category 검증
+    if (!params.category || typeof params.category !== 'string') {
       return notFound()
     }
 
-    const post = await postsService.getPostBySlug(params.slug)
+    const post = await postsService.getPostByCategory(params.category)
 
     if (!post) {
       return notFound()

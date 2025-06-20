@@ -33,7 +33,7 @@ function AdminDashboard() {
     title: '',
     content: '',
     excerpt: '',
-    slug: '',
+    category: '',
     status: 'published',
     tags: [],
     read_time: 5
@@ -74,7 +74,7 @@ function AdminDashboard() {
         title: '',
         content: '',
         excerpt: '',
-        slug: '',
+        category: '',
         status: 'published',
         tags: [],
         read_time: 5
@@ -97,7 +97,7 @@ function AdminDashboard() {
         title: '',
         content: '',
         excerpt: '',
-        slug: '',
+        category: '',
         status: 'published',
         tags: [],
         read_time: 5
@@ -125,7 +125,7 @@ function AdminDashboard() {
       title: post.title,
       content: post.content,
       excerpt: post.excerpt || '',
-      slug: post.slug,
+      category: post.category,
       status: post.status,
       tags: post.tags,
       read_time: post.read_time
@@ -140,7 +140,7 @@ function AdminDashboard() {
       title: '',
       content: '',
       excerpt: '',
-      slug: '',
+      category: '',
       status: 'published',
       tags: [],
       read_time: 5
@@ -172,9 +172,9 @@ function AdminDashboard() {
         />
         <input
           className="w-full border px-3 py-2 rounded"
-          placeholder="슬러그 (영어, 숫자, - 만)"
-          value={formData.slug}
-          onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+          placeholder="카테고리"
+          value={formData.category}
+          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
           required
         />
         <input
@@ -206,7 +206,7 @@ function AdminDashboard() {
             <div className="flex gap-2">
               <button
                 className="px-3 py-1 bg-gray-200 rounded"
-                onClick={() => router.push(`/articles/${post.slug}`)}
+                onClick={() => router.push(`/articles/${post.category}`)}
               >
                 보기
               </button>

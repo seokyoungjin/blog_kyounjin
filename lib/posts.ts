@@ -71,16 +71,16 @@ export const postsService = {
   },
 
   // 특정 글 가져오기
-  async getPostBySlug(slug: string): Promise<Post | null> {
+  async getPostByCategory(category: string): Promise<Post | null> {
     try {
-      if (!slug) {
-        throw new PostError('게시글 주소가 제공되지 않았습니다.')
+      if (!category) {
+        throw new PostError('카테고리가 제공되지 않았습니다.')
       }
 
       const { data, error } = await supabase
         .from('posts')
         .select('*')
-        .eq('slug', slug)
+        .eq('slug', category)
         .eq('status', 'published')
         .single()
 
@@ -88,7 +88,7 @@ export const postsService = {
         if (error.code === 'PGRST116') {
           return null // 데이터 없음 - notFound()로 처리
         }
-        handleSupabaseError(error, 'getPostBySlug')
+        handleSupabaseError(error, 'getPostByCategory')
       }
       return data
     } catch (error) {
@@ -125,8 +125,8 @@ export const postsService = {
       if (!postData.title?.trim()) {
         throw new PostError('제목은 필수입니다.')
       }
-      if (!postData.slug?.trim()) {
-        throw new PostError('게시글 주소는 필수입니다.')
+      if (!postData.category?.trim()) {
+        throw new PostError('카테고리는 필수입니다.')
       }
       if (!postData.content?.trim()) {
         throw new PostError('내용은 필수입니다.')
@@ -134,8 +134,10 @@ export const postsService = {
 
       // status가 published면 published_at을 현재 시각으로 자동 할당
       const now = new Date().toISOString()
+      const { category, ...restOfPostData } = postData
       const dataToInsert = {
-        ...postData,
+        ...restOfPostData,
+        slug: category,
         author_id: user.id,
         published_at: postData.status === 'published' ? now : null
       }
@@ -161,9 +163,15 @@ export const postsService = {
         throw new PostError('게시글 ID가 제공되지 않았습니다.')
       }
 
+      const { category, ...restOfPostData } = postData
+      const dataToUpdate: Omit<UpdatePostData, 'category'> & { slug?: string } = { ...restOfPostData }
+      if (category) {
+        dataToUpdate.slug = category
+      }
+
       const { data, error } = await supabase
         .from('posts')
-        .update(postData)
+        .update(dataToUpdate)
         .eq('id', id)
         .select()
         .single()

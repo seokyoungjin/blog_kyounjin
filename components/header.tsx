@@ -4,9 +4,13 @@ import Link from "next/link"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Menu, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const router = useRouter()
+  const { user, signOut } = useAuth()
 
   const navigation = [
     { name: "Home", href: "/" },
@@ -14,6 +18,11 @@ export default function Header() {
     { name: "Articles", href: "/articles" },
     { name: "Admin", href: "/admin" },
   ]
+
+  async function handleLogout() {
+    const { error } = await signOut()
+    if (!error) router.push("/admin/login")
+  }
 
   return (
     <header className="border-b border-gray-200 bg-white sticky top-0 z-50">
@@ -25,7 +34,7 @@ export default function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-8">
+          <nav className="hidden md:flex space-x-8 items-center">
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -35,6 +44,16 @@ export default function Header() {
                 {item.name}
               </Link>
             ))}
+            {user && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-4 text-black border-black hover:bg-gray-100"
+                onClick={handleLogout}
+              >
+                로그아웃
+              </Button>
+            )}
           </nav>
 
           {/* Mobile menu button */}
@@ -57,6 +76,16 @@ export default function Header() {
                   {item.name}
                 </Link>
               ))}
+              {user && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2 text-black border-black hover:bg-gray-100"
+                  onClick={() => { setIsMenuOpen(false); handleLogout() }}
+                >
+                  로그아웃
+                </Button>
+              )}
             </div>
           </div>
         )}
