@@ -82,7 +82,7 @@ export default async function HomePage() {
                 >
                   <CardHeader>
                     <CardTitle className="text-xl font-semibold text-black hover:text-gray-700 transition-colors">
-                      <Link href={`/articles/${post.slug}`}>{post.title}</Link>
+                      <Link href={`/articles/${post.category}`}>{post.title}</Link>
                     </CardTitle>
                     <div className="flex items-center text-sm text-gray-500 space-x-4">
                       <div className="flex items-center">
@@ -107,7 +107,7 @@ export default async function HomePage() {
                       ))}
                     </div>
                     <Link
-                      href={`/articles/${post.slug}`}
+                      href={`/articles/${post.category}`}
                       className="inline-flex items-center text-black hover:text-gray-700 font-medium transition-colors"
                     >
                       더 읽기
