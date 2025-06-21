@@ -1,36 +1,55 @@
-import { supabase } from './supabase'
-import { Post, CreatePostData, UpdatePostData, PostStats } from '@/types/post'
+import { supabase } from "./supabase";
+import { Post, CreatePostData, UpdatePostData, PostStats } from "@/types/post";
 
 // 사용자 친화적인 에러 클래스
 class PostError extends Error {
   constructor(message: string, public code?: string) {
-    super(message)
-    this.name = 'PostError'
+    super(message);
+    this.name = "PostError";
   }
 }
 
 // Supabase 에러를 사용자 친화적인 에러로 변환
 function handleSupabaseError(error: any, context: string): never {
-  console.error(`Supabase Error in ${context}:`, error)
-  
+  console.error(`Supabase Error in ${context}:`, error);
+
   // Supabase 에러 코드별 처리
   switch (error.code) {
-    case 'PGRST116': // 데이터 없음
-      throw new PostError('요청하신 데이터를 찾을 수 없습니다.', error.code)
-    case '23505': // 중복 키 (unique constraint violation)
-      throw new PostError('이미 존재하는 데이터입니다.', error.code)
-    case '23503': // 외래 키 제약 조건 위반
-      throw new PostError('관련된 데이터가 없어 처리할 수 없습니다.', error.code)
-    case '42501': // 권한 없음
-      throw new PostError('이 작업을 수행할 권한이 없습니다.', error.code)
-    case '42P01': // 테이블 없음
-      throw new PostError('데이터베이스 테이블을 찾을 수 없습니다.', error.code)
+    case "PGRST116": // 데이터 없음
+      throw new PostError("요청하신 데이터를 찾을 수 없습니다.", error.code);
+    case "23505": // 중복 키 (unique constraint violation)
+      throw new PostError("이미 존재하는 데이터입니다.", error.code);
+    case "23503": // 외래 키 제약 조건 위반
+      throw new PostError(
+        "관련된 데이터가 없어 처리할 수 없습니다.",
+        error.code
+      );
+    case "42501": // 권한 없음
+      throw new PostError("이 작업을 수행할 권한이 없습니다.", error.code);
+    case "42P01": // 테이블 없음
+      throw new PostError(
+        "데이터베이스 테이블을 찾을 수 없습니다.",
+        error.code
+      );
     default:
       throw new PostError(
-        error.message || '데이터베이스 작업 중 오류가 발생했습니다.',
+        error.message || "데이터베이스 작업 중 오류가 발생했습니다.",
         error.code
-      )
+      );
   }
+}
+
+const selectQuery =
+  "id, title, content, excerpt, category, status, tags, author_id, published_at, created_at, updated_at, view_count, read_time";
+
+// URL-safe slug 생성 함수
+function createSlug(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export const postsService = {
@@ -38,16 +57,16 @@ export const postsService = {
   async getPublishedPosts(): Promise<Post[]> {
     try {
       const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('status', 'published')
-        .order('published_at', { ascending: false })
+        .from("posts")
+        .select(selectQuery)
+        .eq("status", "published")
+        .order("published_at", { ascending: false });
 
-      if (error) handleSupabaseError(error, 'getPublishedPosts')
-      return data || []
+      if (error) handleSupabaseError(error, "getPublishedPosts");
+      return data || [];
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('게시글 목록을 불러오는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("게시글 목록을 불러오는 중 오류가 발생했습니다.");
     }
   },
 
@@ -55,45 +74,67 @@ export const postsService = {
   async getRecentPosts(limit: number = 5): Promise<Post[]> {
     try {
       const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('status', 'published')
-        .not('published_at', 'is', null)
-        .order('published_at', { ascending: false })
-        .limit(limit)
+        .from("posts")
+        .select(selectQuery)
+        .eq("status", "published")
+        .not("published_at", "is", null)
+        .order("published_at", { ascending: false })
+        .limit(limit);
 
-      if (error) handleSupabaseError(error, 'getRecentPosts')
-      return data || []
+      if (error) handleSupabaseError(error, "getRecentPosts");
+      return data || [];
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('최근 게시글을 불러오는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("최근 게시글을 불러오는 중 오류가 발생했습니다.");
     }
   },
 
-  // 특정 글 가져오기
-  async getPostByCategory(category: string): Promise<Post | null> {
+  // 특정 글 가져오기 (category 또는 slug로 검색)
+  async getPostByCategory(categoryOrSlug: string): Promise<Post | null> {
     try {
-      if (!category) {
-        throw new PostError('카테고리가 제공되지 않았습니다.')
+      if (!categoryOrSlug) {
+        throw new PostError("카테고리가 제공되지 않았습니다.");
       }
 
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('slug', category)
-        .eq('status', 'published')
-        .single()
+      // 먼저 category로 직접 검색
+      let { data, error } = await supabase
+        .from("posts")
+        .select(selectQuery)
+        .eq("category", categoryOrSlug)
+        .eq("status", "published")
+        .single();
+
+      // 직접 검색에 실패하면 slug로 변환해서 검색
+      if (error && error.code === "PGRST116") {
+        const { data: allPosts, error: allError } = await supabase
+          .from("posts")
+          .select(selectQuery)
+          .eq("status", "published");
+
+        if (allError) handleSupabaseError(allError, "getPostByCategory");
+
+        // 모든 게시글에서 slug가 일치하는 것 찾기
+        const foundPost = allPosts?.find(
+          (post) => createSlug(post.category) === categoryOrSlug
+        );
+
+        if (foundPost) {
+          return foundPost;
+        }
+
+        return null; // 최종적으로 찾지 못함
+      }
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          return null // 데이터 없음 - notFound()로 처리
+        if (error.code === "PGRST116") {
+          return null; // 데이터 없음 - notFound()로 처리
         }
-        handleSupabaseError(error, 'getPostByCategory')
+        handleSupabaseError(error, "getPostByCategory");
       }
-      return data
+      return data;
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('게시글을 불러오는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("게시글을 불러오는 중 오류가 발생했습니다.");
     }
   },
 
@@ -101,15 +142,15 @@ export const postsService = {
   async getAllPosts(): Promise<Post[]> {
     try {
       const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false })
+        .from("posts")
+        .select(selectQuery)
+        .order("created_at", { ascending: false });
 
-      if (error) handleSupabaseError(error, 'getAllPosts')
-      return data || []
+      if (error) handleSupabaseError(error, "getAllPosts");
+      return data || [];
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('모든 게시글을 불러오는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("모든 게시글을 불러오는 중 오류가 발생했습니다.");
     }
   },
 
@@ -117,42 +158,43 @@ export const postsService = {
   async createPost(postData: CreatePostData): Promise<Post> {
     try {
       // 현재 로그인한 유저 정보 가져오기
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      if (authError) throw new PostError('인증 정보를 확인할 수 없습니다.')
-      if (!user) throw new PostError('로그인이 필요합니다.')
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError) throw new PostError("인증 정보를 확인할 수 없습니다.");
+      if (!user) throw new PostError("로그인이 필요합니다.");
 
       // 필수 필드 검증
       if (!postData.title?.trim()) {
-        throw new PostError('제목은 필수입니다.')
+        throw new PostError("제목은 필수입니다.");
       }
       if (!postData.category?.trim()) {
-        throw new PostError('카테고리는 필수입니다.')
+        throw new PostError("카테고리는 필수입니다.");
       }
       if (!postData.content?.trim()) {
-        throw new PostError('내용은 필수입니다.')
+        throw new PostError("내용은 필수입니다.");
       }
 
       // status가 published면 published_at을 현재 시각으로 자동 할당
-      const now = new Date().toISOString()
-      const { category, ...restOfPostData } = postData
+      const now = new Date().toISOString();
       const dataToInsert = {
-        ...restOfPostData,
-        slug: category,
+        ...postData,
         author_id: user.id,
-        published_at: postData.status === 'published' ? now : null
-      }
+        published_at: postData.status === "published" ? now : null,
+      };
 
       const { data, error } = await supabase
-        .from('posts')
+        .from("posts")
         .insert([dataToInsert])
-        .select()
-        .single()
+        .select(selectQuery)
+        .single();
 
-      if (error) handleSupabaseError(error, 'createPost')
-      return data
+      if (error) handleSupabaseError(error, "createPost");
+      return data;
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('게시글을 생성하는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("게시글을 생성하는 중 오류가 발생했습니다.");
     }
   },
 
@@ -160,27 +202,21 @@ export const postsService = {
   async updatePost(id: string, postData: UpdatePostData): Promise<Post> {
     try {
       if (!id) {
-        throw new PostError('게시글 ID가 제공되지 않았습니다.')
-      }
-
-      const { category, ...restOfPostData } = postData
-      const dataToUpdate: Omit<UpdatePostData, 'category'> & { slug?: string } = { ...restOfPostData }
-      if (category) {
-        dataToUpdate.slug = category
+        throw new PostError("게시글 ID가 제공되지 않았습니다.");
       }
 
       const { data, error } = await supabase
-        .from('posts')
-        .update(dataToUpdate)
-        .eq('id', id)
-        .select()
-        .single()
+        .from("posts")
+        .update(postData)
+        .eq("id", id)
+        .select(selectQuery)
+        .single();
 
-      if (error) handleSupabaseError(error, 'updatePost')
-      return data
+      if (error) handleSupabaseError(error, "updatePost");
+      return data;
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('게시글을 수정하는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("게시글을 수정하는 중 오류가 발생했습니다.");
     }
   },
 
@@ -188,18 +224,15 @@ export const postsService = {
   async deletePost(id: string): Promise<void> {
     try {
       if (!id) {
-        throw new PostError('게시글 ID가 제공되지 않았습니다.')
+        throw new PostError("게시글 ID가 제공되지 않았습니다.");
       }
 
-      const { error } = await supabase
-        .from('posts')
-        .delete()
-        .eq('id', id)
+      const { error } = await supabase.from("posts").delete().eq("id", id);
 
-      if (error) handleSupabaseError(error, 'deletePost')
+      if (error) handleSupabaseError(error, "deletePost");
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('게시글을 삭제하는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("게시글을 삭제하는 중 오류가 발생했습니다.");
     }
   },
 
@@ -207,35 +240,35 @@ export const postsService = {
   async incrementViewCount(id: string): Promise<void> {
     try {
       if (!id) {
-        throw new PostError('게시글 ID가 제공되지 않았습니다.')
+        throw new PostError("게시글 ID가 제공되지 않았습니다.");
       }
 
-      const { error } = await supabase.rpc('increment_view_count', { post_id: id })
-      if (error) handleSupabaseError(error, 'incrementViewCount')
+      const { error } = await supabase.rpc("increment_view_count", {
+        post_id: id,
+      });
+      if (error) handleSupabaseError(error, "incrementViewCount");
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('조회수를 업데이트하는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("조회수를 업데이트하는 중 오류가 발생했습니다.");
     }
   },
 
   // 통계 가져오기
   async getStats(): Promise<PostStats> {
     try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('status')
+      const { data, error } = await supabase.from("posts").select("status");
 
-      if (error) handleSupabaseError(error, 'getStats')
+      if (error) handleSupabaseError(error, "getStats");
 
-      const posts = data || []
+      const posts = data || [];
       return {
         total: posts.length,
-        published: posts.filter(p => p.status === 'published').length,
-        draft: posts.filter(p => p.status === 'draft').length
-      }
+        published: posts.filter((p) => p.status === "published").length,
+        draft: posts.filter((p) => p.status === "draft").length,
+      };
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('통계를 불러오는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("통계를 불러오는 중 오류가 발생했습니다.");
     }
   },
 
@@ -243,21 +276,21 @@ export const postsService = {
   async getPostsByTag(tag: string): Promise<Post[]> {
     try {
       if (!tag?.trim()) {
-        throw new PostError('검색할 태그가 제공되지 않았습니다.')
+        throw new PostError("검색할 태그가 제공되지 않았습니다.");
       }
 
       const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('status', 'published')
-        .contains('tags', [tag])
-        .order('published_at', { ascending: false })
+        .from("posts")
+        .select(selectQuery)
+        .eq("status", "published")
+        .contains("tags", [tag])
+        .order("published_at", { ascending: false });
 
-      if (error) handleSupabaseError(error, 'getPostsByTag')
-      return data || []
+      if (error) handleSupabaseError(error, "getPostsByTag");
+      return data || [];
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('태그로 게시글을 검색하는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("태그로 게시글을 검색하는 중 오류가 발생했습니다.");
     }
   },
 
@@ -265,21 +298,21 @@ export const postsService = {
   async searchPosts(query: string): Promise<Post[]> {
     try {
       if (!query?.trim()) {
-        throw new PostError('검색어가 제공되지 않았습니다.')
+        throw new PostError("검색어가 제공되지 않았습니다.");
       }
 
       const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('status', 'published')
+        .from("posts")
+        .select(selectQuery)
+        .eq("status", "published")
         .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
-        .order('published_at', { ascending: false })
+        .order("published_at", { ascending: false });
 
-      if (error) handleSupabaseError(error, 'searchPosts')
-      return data || []
+      if (error) handleSupabaseError(error, "searchPosts");
+      return data || [];
     } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError('게시글을 검색하는 중 오류가 발생했습니다.')
+      if (error instanceof PostError) throw error;
+      throw new PostError("게시글을 검색하는 중 오류가 발생했습니다.");
     }
-  }
-} 
+  },
+};

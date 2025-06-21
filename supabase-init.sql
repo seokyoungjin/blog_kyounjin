@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS posts (
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
   excerpt TEXT,
-  slug VARCHAR(255) UNIQUE NOT NULL,
+  category VARCHAR(255) UNIQUE NOT NULL,
   status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
   tags TEXT[] DEFAULT '{}',
   author_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status);
 CREATE INDEX IF NOT EXISTS idx_posts_published_at ON posts(published_at);
 CREATE INDEX IF NOT EXISTS idx_posts_author_id ON posts(author_id);
-CREATE INDEX IF NOT EXISTS idx_posts_slug ON posts(slug);
+CREATE INDEX IF NOT EXISTS idx_posts_category ON posts(category);
 
 -- updated_at 자동 업데이트를 위한 함수
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -59,7 +59,7 @@ CREATE POLICY "Users can manage their own posts" ON posts
 --   );
 
 -- 샘플 데이터 삽입 (테스트용)
-INSERT INTO posts (title, content, excerpt, slug, status, tags, published_at, view_count, read_time) VALUES
+INSERT INTO posts (title, content, excerpt, category, status, tags, published_at, view_count, read_time) VALUES
 (
   'Next.js 15의 새로운 기능들',
   '# Next.js 15의 새로운 기능들
